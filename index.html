@@ -1,1 +1,339 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brussy - Barbería | Reservar Turno</title>
+  <style>
+    /* VARIABLES Y PALETA DE COLORES (Verde Brussy + Metal) */
+    :root {
+      --bg-main: #0a1f18;
+      --green-primary: #1e7e43;
+      --green-accent: #2ecc71;
+      --green-dark: #0d3822;
+      --metal-gradient: linear-gradient(145deg, #a8a9ad, #6b6c70);
+      --metal-panel: linear-gradient(180deg, #78797d 0%, #4a4b4e 100%);
+      --text-color: #ffffff;
+      --text-muted: #d0d0d0;
+      --btn-mp: #009ee3;
+    }
 
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-color);
+      display: flex;
+      justify-content: center;
+      padding: 20px 10px;
+      min-height: 100vh;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 420px;
+      background-color: #06140f;
+      border: 3px solid var(--green-primary);
+      border-radius: 20px;
+      padding: 15px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
+    }
+
+    /* HEADER / LOGO */
+    .header-panel {
+      background: var(--metal-panel);
+      border-radius: 12px;
+      padding: 15px;
+      text-align: center;
+      margin-bottom: 15px;
+      border: 1px solid #999;
+      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.4);
+    }
+
+    .logo {
+      width: 60px;
+      height: auto;
+      margin-bottom: 5px;
+    }
+
+    .brand-title {
+      font-family: 'Times New Roman', Times, serif;
+      font-size: 1.4rem;
+      letter-spacing: 2px;
+      color: #111;
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    /* PANELES METÁLICOS */
+    .metal-card {
+      background: var(--metal-panel);
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 15px;
+      border: 1px solid #888;
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), 0 4px 8px rgba(0,0,0,0.5);
+    }
+
+    .card-title {
+      text-align: center;
+      font-family: 'Times New Roman', Times, serif;
+      font-size: 1.2rem;
+      color: #111;
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+    }
+
+    .card-title span {
+      color: var(--green-dark);
+      font-weight: bold;
+    }
+
+    /* CALENDARIO Y FECHAS */
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+      text-align: center;
+      font-size: 0.8rem;
+      margin-bottom: 15px;
+    }
+
+    .day-name {
+      font-weight: bold;
+      color: #111;
+      padding-bottom: 4px;
+    }
+
+    .day-btn {
+      background-color: #555659;
+      color: #fff;
+      border: none;
+      padding: 6px 0;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      transition: all 0.2s;
+    }
+
+    .day-btn.active {
+      background-color: var(--green-primary);
+      box-shadow: 0 0 5px var(--green-accent);
+      font-weight: bold;
+    }
+
+    .day-btn.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* OPCIONES DE SERVICIO */
+    .service-selector {
+      margin-top: 10px;
+    }
+
+    .service-select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #333;
+      background: #dcdcdc;
+      color: #111;
+      font-weight: bold;
+      font-size: 0.95rem;
+    }
+
+    /* FORMULARIO Y RESUMEN */
+    .input-group {
+      margin-bottom: 10px;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background-color: #e0e0e0;
+      color: #111;
+    }
+
+    .price-summary {
+      text-align: center;
+      font-weight: bold;
+      color: #111;
+      margin: 10px 0;
+      font-size: 0.95rem;
+    }
+
+    /* BOTONES ACCIÓN */
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 0.95rem;
+      cursor: pointer;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      transition: transform 0.1s;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-mp {
+      background-color: var(--btn-mp);
+      color: white;
+    }
+
+    .btn-ws {
+      background-color: transparent;
+      border: 2px solid var(--green-primary);
+      color: #111;
+      background: linear-gradient(180deg, #8a8b8e, #5a5b5e);
+    }
+
+    .btn-ws:hover {
+      background: var(--green-primary);
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <div class="header-panel">
+      <svg class="logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M50 10 L80 30 L80 70 L50 90 L20 70 L20 30 Z" fill="#1e7e43" stroke="#2ecc71" stroke-width="3"/>
+        <path d="M35 35 H60 C65 35 65 48 55 48 H35 V35 Z" fill="#0a1f18"/>
+        <path d="M35 48 H62 C68 48 68 65 55 65 H35 V48 Z" fill="#0a1f18"/>
+      </svg>
+      <div class="brand-title">BRUSSY</div>
+    </div>
+
+    <div class="metal-card">
+      <div class="card-title">
+        RESERVAR TURNO<br>CON <span>BRUNO PEREZ</span>
+      </div>
+
+      <div class="calendar-grid">
+        <div class="day-name">L</div>
+        <div class="day-name">M</div>
+        <div class="day-name">M</div>
+        <div class="day-name">J</div>
+        <div class="day-name">V</div>
+        <div class="day-name">S</div>
+        <div class="day-name">S</div>
+
+        <button class="day-btn disabled">01</button>
+        <button class="day-btn active" onclick="seleccionarDia(this, '02')">02</button>
+        <button class="day-btn" onclick="seleccionarDia(this, '03')">03</button>
+        <button class="day-btn" onclick="seleccionarDia(this, '04')">04</button>
+        <button class="day-btn" onclick="seleccionarDia(this, '05')">05</button>
+        <button class="day-btn disabled">18</button>
+        <button class="day-btn disabled">17</button>
+        
+        <button class="day-btn" onclick="seleccionarDia(this, '18')">18</button>
+        <button class="day-btn" onclick="seleccionarDia(this, '19')">19</button>
+        <button class="day-btn" onclick="seleccionarDia(this, '20')">20</button>
+        <button class="day-btn" onclick="seleccionarDia(this, '25')">25</button>
+        <button class="day-btn" onclick="seleccionarDia(this, '26')">26</button>
+        <button class="day-btn" onclick="seleccionarDia(this, '27')">27</button>
+        <button class="day-btn" onclick="seleccionarDia(this, '28')">28</button>
+      </div>
+
+      <div class="service-selector">
+        <select id="servicio" class="service-select" onchange="actualizarMonto()">
+          <option value="Corte" data-sena="1000">Corte de Pelo</option>
+          <option value="Barba" data-sena="800">Perfilado de Barba</option>
+          <option value="Corte + Barba" data-sena="1200" selected>Corte + Barba</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="metal-card">
+      <div class="input-group">
+        <input type="text" id="nombreCliente" placeholder="Tu Nombre Completo" required />
+      </div>
+
+      <div class="price-summary" id="textoSena">
+        Monto Seña: $1200 ARS
+      </div>
+
+      <button class="btn btn-mp" onclick="pagarMercadoPago()">
+        PAGAR SEÑA CON MERCADO PAGO
+      </button>
+
+      <button class="btn btn-ws" onclick="confirmarWhatsApp()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/>
+        </svg>
+        CONFIRMAR POR WHATSAPP
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    let diaSeleccionado = "02";
+    let telefonoBarberia = "5493420000000"; // PONER AQUÍ EL TELÉFONO DE BRUNO CON CÓDIGO DE PAÍS
+
+    function seleccionarDia(elemento, dia) {
+      document.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('active'));
+      elemento.classList.add('active');
+      diaSeleccionado = dia;
+    }
+
+    function actualizarMonto() {
+      const select = document.getElementById('servicio');
+      const sena = select.options[select.selectedIndex].getAttribute('data-sena');
+      document.getElementById('textoSena').innerText = `Monto Seña: $${sena} ARS`;
+    }
+
+    function pagarMercadoPago() {
+      const nombre = document.getElementById('nombreCliente').value;
+      if (!nombre) {
+        alert("Por favor, ingresá tu nombre antes de proceder al pago.");
+        return;
+      }
+      
+      // AVISO: Redirección de prueba a checkout de Mercado Pago
+      alert(`Redirigiendo a Mercado Pago para abonar la seña de $${obtenerSenaActual()} ARS...`);
+      // window.location.href = "LINK_DE_PAGO_MERCADO_PAGO";
+    }
+
+    function obtenerSenaActual() {
+      const select = document.getElementById('servicio');
+      return select.options[select.selectedIndex].getAttribute('data-sena');
+    }
+
+    function confirmarWhatsApp() {
+      const nombre = document.getElementById('nombreCliente').value;
+      const servicio = document.getElementById('servicio').value;
+      const sena = obtenerSenaActual();
+
+      if (!nombre) {
+        alert("Por favor, ingresá tu nombre para enviar el mensaje.");
+        return;
+      }
+
+      const mensaje = `Hola Bruno! Soy ${nombre}. Reservé un turno para el día ${diaSeleccionado} para el servicio: ${servicio}. Adjunto comprobante de seña de $${sena} ARS.`;
+      const url = `https://wa.me/${telefonoBarberia}?text=${encodeURIComponent(mensaje)}`;
+      
+      window.open(url, '_blank');
+    }
+  </script>
+</body>
+</html>
