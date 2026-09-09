@@ -1434,7 +1434,7 @@ async function loadCloudState({quiet=false}={}){
       }
     }
     try{localStorage.setItem(CONFIG.storageKey,JSON.stringify(state));}catch(_){ }
-    renderAll();
+    renderAllPreserveScroll();
   }catch(e){ if(!quiet) console.warn('No se pudo sincronizar con Supabase:',e); }
   finally{cloudSyncing=false;}
 }
@@ -1479,7 +1479,7 @@ async function updateAppointmentOnline(id,patch){
 
 async function syncCloudPeriodically(){
   await loadCloudState({quiet:true});
-  if(activeClientId){clientHasBookedThisSession=state.appointments.some(a=>a.clientId===activeClientId&&['pending','confirmed'].includes(a.status));renderAll();}
+  if(activeClientId){clientHasBookedThisSession=state.appointments.some(a=>a.clientId===activeClientId&&['pending','confirmed'].includes(a.status));renderAllPreserveScroll();}
   clearTimeout(cloudPollingTimer);
   cloudPollingTimer=setTimeout(syncCloudPeriodically,5000);
 }
@@ -1537,7 +1537,7 @@ try{
       if(!e.data||e.data.type!=='STATE_UPDATED'||!e.data.state)return;
       try{
         state=normalizeState(e.data.state);
-        renderAll();
+        renderAllPreserveScroll();
       }catch(_){}
     };
   }
@@ -1548,7 +1548,7 @@ window.addEventListener('storage',e=>{
   try{
     /* Siempre se actualiza: un turno puede cambiar de estado sin aumentar la cantidad total. */
     state=normalizeState(JSON.parse(e.newValue));
-    renderAll();
+    renderAllPreserveScroll();
   }catch(_){}
 });
 
@@ -1558,7 +1558,7 @@ document.addEventListener('visibilitychange',()=>{
     const raw=localStorage.getItem(CONFIG.storageKey);
     if(raw){
       state=normalizeState(JSON.parse(raw));
-      renderAll();
+      renderAllPreserveScroll();
     }
   }catch(_){}
 });
@@ -1811,6 +1811,13 @@ function exportBackup(){const blob=new Blob([JSON.stringify(state,null,2)],{type
 function importBackup(ev){const file=ev.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const incoming=JSON.parse(reader.result);if(!incoming.clients||!incoming.appointments||!incoming.cuts)throw new Error('Formato inválido');state={...defaultState(),...incoming,settings:{...defaultState().settings,...(incoming.settings||{})}};saveState();showToast('Respaldo restaurado.');}catch(e){showToast('No se pudo restaurar el respaldo.');}};reader.readAsText(file);}
 function changeBarberPin(){const next=prompt('Nueva contraseña del barbero:',state.settings.barberPin);if(next&&next.trim().length>=4){state.settings.barberPin=next.trim();saveState();showToast('Contraseña actualizada.');}}
 function renderAll(){updateUserStatus();renderCalendar();renderTimes();renderPrice();renderFidelity();renderCustomerPanel();if(barberLogged)renderBarber();}
+
+/* Las sincronizaciones en segundo plano actualizan datos sin mover la posición del usuario. */
+function renderAllPreserveScroll(){
+  const x=window.scrollX, y=window.scrollY;
+  renderAll();
+  requestAnimationFrame(()=>window.scrollTo(x,y));
+}
 renderAll();
 restaurarRespaldoSiHaceFalta();
 startCloudSync();
