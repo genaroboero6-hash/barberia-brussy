@@ -1810,7 +1810,12 @@ function renderBackupTab(){const box=document.getElementById('tab-backup');box.i
 function exportBackup(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`brussy-respaldo-${isoDateLocal(new Date())}.json`;a.click();URL.revokeObjectURL(a.href);showToast('Respaldo descargado.');}
 function importBackup(ev){const file=ev.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const incoming=JSON.parse(reader.result);if(!incoming.clients||!incoming.appointments||!incoming.cuts)throw new Error('Formato inválido');state={...defaultState(),...incoming,settings:{...defaultState().settings,...(incoming.settings||{})}};saveState();showToast('Respaldo restaurado.');}catch(e){showToast('No se pudo restaurar el respaldo.');}};reader.readAsText(file);}
 function changeBarberPin(){const next=prompt('Nueva contraseña del barbero:',state.settings.barberPin);if(next&&next.trim().length>=4){state.settings.barberPin=next.trim();saveState();showToast('Contraseña actualizada.');}}
-function renderAll(){updateUserStatus();renderCalendar();renderTimes();renderPrice();renderFidelity();renderCustomerPanel();if(barberLogged)renderBarber();}
+function renderAll(){
+  const sx=window.scrollX, sy=window.scrollY;
+  updateUserStatus();renderCalendar();renderTimes();renderPrice();renderFidelity();renderCustomerPanel();if(barberLogged)renderBarber();
+  /* El refresco de datos online no debe cambiar la posición del scroll del usuario. */
+  requestAnimationFrame(()=>{window.scrollTo(sx,sy);});
+}
 
 /* Las sincronizaciones en segundo plano actualizan datos sin mover la posición del usuario. */
 function renderAllPreserveScroll(){
