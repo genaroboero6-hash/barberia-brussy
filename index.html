@@ -1291,7 +1291,7 @@ button,a{touch-action:manipulation}
           </div>
           <div class="price-box"><div class="price-item selected" id="standardBox"><span>Precio base</span><strong>$12.000</strong></div><div class="price-item" id="weeklyBox"><span>Precio semanal</span><strong>$10.000</strong></div></div>
           <div class="summary"><div><div class="muted">Precio estimado</div><strong id="bookingPriceNote">$12.000</strong></div><div class="amount" id="bookingPrice">$12.000</div></div>
-          <div class="actions"><button class="btn btn-green" type="button" onclick="requestAppointment()">Solicitar este turno</button><button class="btn btn-ghost" type="button" onclick="openCustomerPanel()">Ver mis turnos</button></div>
+          <div class="actions"><button class="btn btn-green" id="requestAppointmentBtn" type="button" onclick="requestAppointment()">Solicitar este turno</button><button class="btn btn-ghost" type="button" onclick="openCustomerPanel()">Ver mis turnos</button></div>
           <div class="flow"><div class="step"><div class="num">1</div><div><b>Reservás</b><span>El turno queda pendiente de confirmación.</span></div></div><div class="step"><div class="num">2</div><div><b>Pagás la seña</b><span>Transferís por Mercado Pago al alias indicado.</span></div></div><div class="step"><div class="num">3</div><div><b>Mandás el comprobante</b><span>WhatsApp abre el chat con Bruno para confirmar.</span></div></div></div>
         </div>
       </section>
@@ -1634,8 +1634,19 @@ function renderTimes(){
 }
 function updateUserStatus(){
   const box=document.getElementById('userStatus'), client=getClient();
-  if(client){ box.innerHTML=`<div><strong>${client.firstName} ${client.lastName}</strong><span>${client.phone} · DNI ${client.dni}</span></div>${clientHasBookedThisSession?'':'<button class="btn btn-ghost" type="button" onclick="logoutClient()">Cerrar sesión</button>'}`; document.getElementById('bookingHint').textContent=clientHasBookedThisSession?'Tu turno quedó registrado.':'Podés elegir fecha y horario.'; }
-  else { box.innerHTML='<div><strong>No hay cliente conectado</strong><span>Necesitás registrarte para reservar.</span></div><button class="btn btn-green" type="button" onclick="openRegister()">Crear cuenta</button>'; document.getElementById('bookingHint').textContent='Primero registrate o iniciá sesión.'; }
+  const requestBtn=document.getElementById('requestAppointmentBtn');
+  if(client){
+    box.innerHTML=`<div><strong>${client.firstName} ${client.lastName}</strong><span>${client.phone} · DNI ${client.dni}</span></div>${clientHasBookedThisSession?'':'<button class="btn btn-ghost" type="button" onclick="logoutClient()">Cerrar sesión</button>'}`;
+    document.getElementById('bookingHint').textContent=clientHasBookedThisSession?'Ya tenés un turno pendiente o confirmado.':'Podés elegir fecha y horario.';
+    if(requestBtn){
+      requestBtn.disabled=clientHasBookedThisSession;
+      requestBtn.title=clientHasBookedThisSession?'Ya tenés un turno activo. Mirá “Ver mis turnos” para gestionarlo.':'';
+    }
+  } else {
+    box.innerHTML='<div><strong>No hay cliente conectado</strong><span>Necesitás registrarte para reservar.</span></div><button class="btn btn-green" type="button" onclick="openRegister()">Crear cuenta</button>';
+    document.getElementById('bookingHint').textContent='Primero registrate o iniciá sesión.';
+    if(requestBtn){requestBtn.disabled=false;requestBtn.title='';}
+  }
 }
 function renderPrice(){
   const client=getClient(); const weekly=client&&isWeeklyEligible(client); const price=client?currentPrice(client.id):CONFIG.standardPrice;
@@ -1704,6 +1715,16 @@ function logoutClient(){activeClientId=null;clientHasBookedThisSession=false;loc
 function selectService(){ document.getElementById('serviceMain').classList.add('active'); }
 async function requestAppointment(){
   const client=getClient(); if(!client){openRegister();showToast('Primero registrate o iniciá sesión.');return;}
+  /* Un cliente solo puede tener un turno activo a la vez. Esto evita que,
+     después de reservar, pueda pedir otro turno para sí mismo o para otra persona. */
+  const activeAppointment=state.appointments.find(a=>a.clientId===client.id&&['pending','confirmed'].includes(a.status));
+  if(activeAppointment){
+    clientHasBookedThisSession=true;
+    updateUserStatus();
+    openCustomerPanel();
+    showToast('Ya tenés un turno activo. No podés solicitar otro hasta cancelarlo o que Bruno lo registre como realizado.');
+    return;
+  }
   if(!selectedDate||!selectedTime){showToast('Elegí un día y un horario.');return;}
   if(isTaken(selectedDate,selectedTime)){showToast('Ese horario ya está ocupado. Elegí otro.');renderTimes();return;}
   const price=currentPrice(client.id);
