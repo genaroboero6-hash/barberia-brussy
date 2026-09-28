@@ -1623,7 +1623,7 @@ function renderCalendar(){
   }
   if(!selectedDate || !buildTimes(selectedDate).length) selectedDate=firstValid;
   document.getElementById('monthLabel').textContent=[...months].slice(0,2).join(' / ');
-  requestAnimationFrame(()=>document.querySelector('.day.active')?.scrollIntoView({inline:'center',block:'nearest'}));
+  /* No mover la página automáticamente al refrescar el calendario. */
 }
 function renderTimes(){
   const grid=document.getElementById('timeGrid'); grid.innerHTML='';
