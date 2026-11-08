@@ -1376,9 +1376,9 @@ html, body {
   <div class="container">
     <div class="section-title"><div><div class="kicker">Modo barbero</div><h2>Panel de Bruno</h2></div><button class="btn btn-ghost" type="button" onclick="closeSection('barberPanel')">Cerrar</button></div>
     <div class="panel-grid">
-      <div class="panel-nav"><button class="active" data-tab="clients" onclick="showBarberTab('clients',this)">Clientes</button><button data-tab="appointments" onclick="showBarberTab('appointments',this)">Turnos</button><button data-tab="history" onclick="showBarberTab('history',this)">Historial</button><button data-tab="scanner" onclick="showBarberTab('scanner',this)">Escanear QR</button><button data-tab="backup" onclick="showBarberTab('backup',this)">Respaldo</button></div>
+      <div class="panel-nav"><button class="active" data-tab="clients" onclick="showBarberTab('clients',this)">Clientes</button><button data-tab="appointments" onclick="showBarberTab('appointments',this)">Turnos</button><button data-tab="blocked" onclick="showBarberTab('blocked',this)">Bloquear horarios</button><button data-tab="history" onclick="showBarberTab('history',this)">Historial</button><button data-tab="scanner" onclick="showBarberTab('scanner',this)">Escanear QR</button><button data-tab="backup" onclick="showBarberTab('backup',this)">Respaldo</button></div>
       <div class="panel-content">
-        <div id="tab-clients"></div><div id="tab-appointments" style="display:none"></div><div id="tab-history" style="display:none"></div><div id="tab-scanner" style="display:none"></div><div id="tab-backup" style="display:none"></div>
+        <div id="tab-clients"></div><div id="tab-appointments" style="display:none"></div><div id="tab-blocked" style="display:none"></div><div id="tab-history" style="display:none"></div><div id="tab-scanner" style="display:none"></div><div id="tab-backup" style="display:none"></div>
       </div>
     </div>
   </div>
@@ -1436,6 +1436,7 @@ let clientHasBookedThisSession=false;
 
 let cloudSyncing=false;
 let cloudPollingTimer=null;
+let blockedSlots=[]; // Bloqueos persistidos en Supabase: time=null significa día completo.
 
 async function supabaseRequest(path, options={}){
   const headers={
@@ -1483,10 +1484,12 @@ async function loadCloudState({quiet=false}={}){
   if(cloudSyncing)return;
   cloudSyncing=true;
   try{
-    const [clients,appointments]=await Promise.all([
+    const [clients,appointments,cloudBlocks]=await Promise.all([
       supabaseRequest('clients?select=*&order=created_at.asc'),
-      supabaseRequest('appointments?select=*&order=date.asc,time.asc')
+      supabaseRequest('appointments?select=*&order=date.asc,time.asc'),
+      supabaseRequest('blocked_slots?select=*&order=date.asc,time.asc')
     ]);
+    blockedSlots=(cloudBlocks||[]).map(b=>({id:b.id,date:b.date,time:b.time?String(b.time).slice(0,5):null,createdAt:b.created_at}));
     await migrateCurrentCompletedAppointments(appointments);
     const currentClientId=activeClientId;
     const merged=normalizeState({clients:clients.map(cloudClientFromRow),appointments:appointments.map(cloudAppointmentFromRow),cuts:state.cuts,rewardRedemptions:state.rewardRedemptions,settings:state.settings});
@@ -1676,26 +1679,31 @@ function buildTimes(dateStr){
   return out;
 }
 function isTaken(date,time,ignoreId=null){ return state.appointments.some(a=>a.date===date&&a.time===time&&['pending','confirmed'].includes(a.status)&&a.id!==ignoreId); }
+function isDayBlocked(date){return blockedSlots.some(b=>b.date===date&&b.time===null);}
+function isSlotBlocked(date,time){return isDayBlocked(date)||blockedSlots.some(b=>b.date===date&&b.time===time);}
 function renderCalendar(){
   const strip=document.getElementById('dateStrip'); strip.innerHTML='';
   const now=new Date(); let firstValid=null; const months=new Set();
   for(let i=0;i<21;i++){
-    const d=new Date(now); d.setDate(now.getDate()+i); const ds=isoDateLocal(d), closed=d.getDay()===0; months.add(MONTHS[d.getMonth()]);
-    const btn=document.createElement('button'); btn.type='button'; btn.className='day'+(closed?' disabled':'')+(selectedDate===ds?' active':''); btn.disabled=closed;
+    const d=new Date(now); d.setDate(now.getDate()+i); const ds=isoDateLocal(d), closed=d.getDay()===0, blocked=isDayBlocked(ds); months.add(MONTHS[d.getMonth()]);
+    const btn=document.createElement('button'); btn.type='button'; btn.className='day'+((closed||blocked)?' disabled':'')+(selectedDate===ds?' active':''); btn.disabled=closed||blocked;
     btn.innerHTML=`<span class="dow">${DAYS[d.getDay()]}</span><span class="dom">${String(d.getDate()).padStart(2,'0')}</span><span class="mon">${MONTHS[d.getMonth()].slice(0,3)}</span>`;
-    if(!closed){ if(!firstValid) firstValid=ds; btn.onclick=()=>{selectedDate=ds;selectedTime=null;renderCalendar();renderTimes();}; }
+    if(!closed&&!blocked){ if(!firstValid) firstValid=ds; btn.onclick=()=>{selectedDate=ds;selectedTime=null;renderCalendar();renderTimes();}; }
     strip.appendChild(btn);
   }
-  if(!selectedDate || !buildTimes(selectedDate).length) selectedDate=firstValid;
+  if(!selectedDate || !buildTimes(selectedDate).length || isDayBlocked(selectedDate)) selectedDate=firstValid;
   document.getElementById('monthLabel').textContent=[...months].slice(0,2).join(' / ');
   /* No mover la página automáticamente al refrescar el calendario. */
 }
 function renderTimes(){
   const grid=document.getElementById('timeGrid'); grid.innerHTML='';
   if(!selectedDate){ grid.innerHTML='<div class="closed">Seleccioná una fecha.</div>'; return; }
+  if(isDayBlocked(selectedDate)){grid.innerHTML='<div class="closed">Este día no tiene turnos disponibles.</div>';return;}
   const slots=buildTimes(selectedDate);
   if(!slots.length){ grid.innerHTML='<div class="closed">Domingo: el local está cerrado.</div>'; return; }
-  for(const t of slots){ const btn=document.createElement('button'); btn.type='button'; const taken=isTaken(selectedDate,t); btn.className='time'+(selectedTime===t?' active':'')+(taken?' taken':''); btn.disabled=taken; btn.textContent=t; if(!taken) btn.onclick=()=>{selectedTime=t;renderTimes();}; grid.appendChild(btn); }
+  const visibleSlots=slots.filter(t=>!isSlotBlocked(selectedDate,t));
+  if(!visibleSlots.length){grid.innerHTML='<div class="closed">No hay horarios disponibles para esta fecha.</div>';return;}
+  for(const t of visibleSlots){ const btn=document.createElement('button'); btn.type='button'; const taken=isTaken(selectedDate,t); btn.className='time'+(selectedTime===t?' active':'')+(taken?' taken':''); btn.disabled=taken; btn.textContent=t; if(!taken) btn.onclick=()=>{selectedTime=t;renderTimes();}; grid.appendChild(btn); }
 }
 function updateUserStatus(){
   const box=document.getElementById('userStatus'), client=getClient();
@@ -1806,9 +1814,17 @@ async function requestAppointment(){
     return;
   }
   if(!selectedDate||!selectedTime){showToast('Elegí un día y un horario.');return;}
+  if(isSlotBlocked(selectedDate,selectedTime)){showToast('Ese horario ya no está disponible. Elegí otro.');selectedTime=null;renderTimes();return;}
   if(isTaken(selectedDate,selectedTime)){showToast('Ese horario ya está ocupado. Elegí otro.');renderTimes();return;}
   const price=currentPrice(client.id);
   try{
+    // Revalidar el bloqueo directamente en Supabase justo antes de reservar,
+    // así un bloqueo reciente de otro dispositivo no queda desactualizado por el sondeo.
+    const freshBlocks=await supabaseRequest('blocked_slots?select=*&date=eq.'+encodeURIComponent(selectedDate));
+    blockedSlots=blockedSlots.filter(b=>b.date!==selectedDate).concat((freshBlocks||[]).map(b=>({id:b.id,date:b.date,time:b.time?String(b.time).slice(0,5):null,createdAt:b.created_at})));
+    if(isSlotBlocked(selectedDate,selectedTime)){
+      selectedTime=null;renderTimes();showToast('Ese horario acaba de ser bloqueado. Elegí otro.');return;
+    }
     const ap=await createAppointmentOnline(client,selectedDate,selectedTime,price);
     state.appointments.push(ap);clientHasBookedThisSession=true;saveState();
     await loadCloudState({quiet:true});
@@ -1857,10 +1873,60 @@ async function copyText(v,quiet=false){ try{await navigator.clipboard.writeText(
 function openBarberLogin(){ if(barberLogged){openBarberPanel();return;} document.getElementById('barberPin').value='';document.getElementById('barberError').classList.remove('show');showModal('barberLoginModal'); }
 function loginBarber(){ const pin=document.getElementById('barberPin').value.trim(); if(pin!==state.settings.barberPin){document.getElementById('barberError').textContent='Contraseña incorrecta.';document.getElementById('barberError').classList.add('show');return;} barberLogged=true;sessionStorage.setItem('brussy_barber_logged','1');hideModal('barberLoginModal');openBarberPanel(); }
 function openBarberPanel(){ document.getElementById('barberPanel').classList.add('show');renderBarber();document.getElementById('barberPanel').scrollIntoView({behavior:'smooth'}); }
-function showBarberTab(tab,btn){ document.querySelectorAll('.panel-nav button').forEach(b=>b.classList.toggle('active',b===btn)); ['clients','appointments','history','scanner','backup'].forEach(x=>document.getElementById('tab-'+x).style.display=x===tab?'block':'none'); if(tab==='scanner') initScanner(); }
-function renderBarber(){ renderClientTab();renderAppointmentTab();renderHistoryTab();renderScannerTab();renderBackupTab(); }
+function showBarberTab(tab,btn){ document.querySelectorAll('.panel-nav button').forEach(b=>b.classList.toggle('active',b===btn)); ['clients','appointments','blocked','history','scanner','backup'].forEach(x=>document.getElementById('tab-'+x).style.display=x===tab?'block':'none'); if(tab==='scanner') initScanner(); if(tab==='blocked') renderBlockedTab(); }
+function renderBarber(){ renderClientTab();renderAppointmentTab();renderBlockedTab();renderHistoryTab();renderScannerTab();renderBackupTab(); }
 function renderClientTab(){ const box=document.getElementById('tab-clients'); const clients=[...state.clients].sort((a,b)=>normalize(a.lastName).localeCompare(normalize(b.lastName))); box.innerHTML=`<div class="card-head"><div><div class="kicker">Base de clientes</div><h3>Registrados · ${clients.length}</h3></div><span class="small">Historial incluido</span></div>`+(clients.length?clients.map(c=>{const cuts=clientCuts(c.id);const aps=clientAppointments(c.id).filter(a=>a.status==='pending'||a.status==='confirmed');return `<div class="client-card"><div><h4>${c.firstName} ${c.lastName}</h4><p>${c.phone} · DNI ${c.dni} · ${cuts.length} corte(s) · ${aps.length} turno(s) activo(s)</p></div><div class="client-actions"><button class="btn btn-ghost tiny" onclick="openHistory('${c.id}')">Historial</button><button class="btn btn-green tiny" onclick="openManualCut('${c.id}')">Registrar corte</button></div></div>`}).join(''):'<div class="empty">Todavía no hay clientes registrados.</div>'); }
 function renderAppointmentTab(){ const box=document.getElementById('tab-appointments'); const aps=[...state.appointments].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)); box.innerHTML=`<div class="card-head"><div><div class="kicker">Agenda</div><h3>Turnos · ${aps.filter(a=>a.status!=='cancelled').length}</h3></div></div>`+(aps.length?`<div style="overflow:auto"><table class="table"><thead><tr><th>Fecha</th><th>Cliente</th><th>Precio</th><th>Estado</th><th></th></tr></thead><tbody>${aps.map(a=>{const c=state.clients.find(x=>x.id===a.clientId);return `<tr><td>${dateLabel(a.date)}<br>${a.time}</td><td><strong>${c?c.firstName+' '+c.lastName:'Cliente eliminado'}</strong><br><span style="color:#6f887c">${c?.phone||''}</span></td><td>${money(a.price)}</td><td><span class="tag-status ${a.status==='pending'?'tag-pending':a.status==='confirmed'?'tag-confirmed':a.status==='cancelled'?'tag-cancelled':'tag-completed'}">${statusLabel(a.status)}</span></td><td><div class="client-actions">${a.status==='pending'?`<button class="btn btn-green tiny" onclick="confirmAppointment('${a.id}')">Aceptar turno</button>`:''}${a.status==='confirmed'?`<button class="btn btn-blue tiny" onclick="completeAppointment('${a.id}')">Registrar corte realizado</button>`:''}${a.status==='pending'||a.status==='confirmed'?`<button class="btn btn-danger tiny" onclick="barberCancelAppointment('${a.id}')">Cancelar</button>`:''}${a.status!=='cancelled'&&a.status!=='completed'?`<button class="btn btn-ghost tiny" onclick="whatsappAppointmentFor('${a.id}')">WhatsApp</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">No hay turnos cargados.</div>'); }
+function renderBlockedTab(){
+  const box=document.getElementById('tab-blocked');
+  const ordered=[...blockedSlots].sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
+  const list=ordered.length?ordered.map(b=>`<div class="client-card"><div><h4>${dateLabel(b.date)}</h4><p>${b.time?`Horario bloqueado: ${b.time}`:'Día completo bloqueado'}</p></div><div class="client-actions"><button class="btn btn-danger tiny" onclick="removeBlockedSlot('${b.id}')">Desbloquear</button></div></div>`).join(''):'<div class="empty">Todavía no hay horarios ni días bloqueados.</div>';
+  box.innerHTML=`<div class="card-head"><div><div class="kicker">Disponibilidad</div><h3>Bloquear horarios</h3></div></div>
+    <div class="info-card" style="margin-bottom:14px"><strong>Bloquear un horario específico</strong><p class="small" style="margin:6px 0 12px">Elegí el día y la hora que querés ocultar. Ese horario dejará de aparecer en la agenda del cliente.</p><div class="form-grid"><div class="field"><label for="blockSlotDate">Fecha</label><input id="blockSlotDate" type="date" min="${isoDateLocal(new Date())}"></div><div class="field"><label for="blockSlotTime">Horario</label><input id="blockSlotTime" type="time" step="1800"></div></div><div class="actions" style="margin-top:12px"><button class="btn btn-green" type="button" onclick="addBlockedSlot()">Bloquear este horario</button></div></div>
+    <div class="info-card" style="margin-bottom:18px"><strong>Bloquear un día entero</strong><p class="small" style="margin:6px 0 12px">Elegí una fecha para que no se muestre ningún horario disponible ese día.</p><div class="field"><label for="blockDayDate">Día completo</label><input id="blockDayDate" type="date" min="${isoDateLocal(new Date())}"></div><div class="actions" style="margin-top:12px"><button class="btn btn-green" type="button" onclick="addBlockedDay()">Bloquear el día entero</button></div></div>
+    <div class="card-head"><div><div class="kicker">Administración</div><h3>Bloqueos activos · ${ordered.length}</h3></div></div>${list}`;
+}
+async function addBlockedSlot(){
+  if(!barberLogged){showToast('Ingresá al modo barbero para realizar esta acción.');return;}
+  const date=document.getElementById('blockSlotDate')?.value;
+  const time=document.getElementById('blockSlotTime')?.value;
+  if(!date||!time){showToast('Elegí una fecha y un horario.');return;}
+  if(isDayBlocked(date)||blockedSlots.some(b=>b.date===date&&b.time===time)){showToast('Ese día u horario ya está bloqueado.');return;}
+  if(!buildTimes(date).includes(time)){showToast('Ese horario no corresponde al horario de atención del local.');return;}
+  if(isTaken(date,time)){showToast('Ese horario ya tiene un turno reservado. No se puede bloquear.');return;}
+  try{
+    const rows=await supabaseRequest('blocked_slots',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify({date,time})});
+    const row=rows?.[0]; if(!row)throw new Error('Supabase no devolvió el bloqueo creado.');
+    blockedSlots.push({id:row.id,date:row.date,time:String(row.time).slice(0,5),createdAt:row.created_at});
+    selectedTime=null;renderAllPreserveScroll();showToast('Horario bloqueado. Ya no aparece para los clientes.');
+  }catch(e){console.error('No se pudo bloquear el horario:',e);showToast('No se pudo guardar el bloqueo en Supabase.');}
+}
+async function addBlockedDay(){
+  if(!barberLogged){showToast('Ingresá al modo barbero para realizar esta acción.');return;}
+  const date=document.getElementById('blockDayDate')?.value;
+  if(!date){showToast('Elegí el día que querés bloquear.');return;}
+  if(!workingHours(date).length){showToast('El local ya permanece cerrado ese día.');return;}
+  if(isDayBlocked(date)){showToast('Ese día ya está bloqueado.');return;}
+  const active=state.appointments.some(a=>a.date===date&&['pending','confirmed'].includes(a.status));
+  if(active){showToast('Ese día tiene turnos reservados. Cancelalos primero si necesitás cerrarlo.');return;}
+  try{
+    const rows=await supabaseRequest('blocked_slots',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify({date,time:null})});
+    const row=rows?.[0]; if(!row)throw new Error('Supabase no devolvió el bloqueo creado.');
+    blockedSlots.push({id:row.id,date:row.date,time:null,createdAt:row.created_at});
+    selectedDate=null;selectedTime=null;renderAllPreserveScroll();showToast('Día completo bloqueado. No aparecerá disponible para los clientes.');
+  }catch(e){console.error('No se pudo bloquear el día:',e);showToast('No se pudo guardar el bloqueo en Supabase.');}
+}
+async function removeBlockedSlot(id){
+  if(!barberLogged)return;
+  const item=blockedSlots.find(b=>b.id===id);if(!item)return;
+  if(!confirm(item.time?`¿Desbloquear el horario ${item.time} del ${dateLabel(item.date)}?`:`¿Volver a habilitar el día ${dateLabel(item.date)}?`))return;
+  try{
+    await supabaseRequest('blocked_slots?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:{'Prefer':'return=minimal'}});
+    blockedSlots=blockedSlots.filter(b=>b.id!==id);
+    renderAllPreserveScroll();showToast('Bloqueo eliminado. El horario volvió a estar disponible.');
+  }catch(e){console.error('No se pudo quitar el bloqueo:',e);showToast('No se pudo quitar el bloqueo. Intentá nuevamente.');}
+}
+
 function renderHistoryTab(){
   const box=document.getElementById('tab-history');
   const cuts=[...state.cuts].sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
