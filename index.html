@@ -1882,18 +1882,43 @@ function renderBlockedTab(){
   const ordered=[...blockedSlots].sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
   const list=ordered.length?ordered.map(b=>`<div class="client-card"><div><h4>${dateLabel(b.date)}</h4><p>${b.time?`Horario bloqueado: ${b.time}`:'Día completo bloqueado'}</p></div><div class="client-actions"><button class="btn btn-danger tiny" onclick="removeBlockedSlot('${b.id}')">Desbloquear</button></div></div>`).join(''):'<div class="empty">Todavía no hay horarios ni días bloqueados.</div>';
   box.innerHTML=`<div class="card-head"><div><div class="kicker">Disponibilidad</div><h3>Bloquear horarios</h3></div></div>
-    <div class="info-card" style="margin-bottom:14px"><strong>Bloquear un horario específico</strong><p class="small" style="margin:6px 0 12px">Elegí el día y la hora que querés ocultar. Ese horario dejará de aparecer en la agenda del cliente.</p><div class="form-grid"><div class="field"><label for="blockSlotDate">Fecha</label><input id="blockSlotDate" type="date" min="${isoDateLocal(new Date())}"></div><div class="field"><label for="blockSlotTime">Horario</label><input id="blockSlotTime" type="time" step="1800"></div></div><div class="actions" style="margin-top:12px"><button class="btn btn-green" type="button" onclick="addBlockedSlot()">Bloquear este horario</button></div></div>
+    <div class="info-card" style="margin-bottom:14px"><strong>Bloquear un horario específico</strong><p class="small" style="margin:6px 0 12px">Elegí el día y la hora que querés ocultar. Ese horario dejará de aparecer en la agenda del cliente.</p><div class="field"><label for="blockSlotDate">Fecha</label><input id="blockSlotDate" type="date" min="${isoDateLocal(new Date())}" value="${blockSlotDateValue||''}" onchange="onBlockSlotDateChange(this.value)"></div><div id="blockSlotTimes" class="times" style="margin-top:12px"></div><div class="actions" style="margin-top:12px"><button class="btn btn-green" type="button" onclick="addBlockedSlot()">Bloquear este horario</button></div></div>
     <div class="info-card" style="margin-bottom:18px"><strong>Bloquear un día entero</strong><p class="small" style="margin:6px 0 12px">Elegí una fecha para que no se muestre ningún horario disponible ese día.</p><div class="field"><label for="blockDayDate">Día completo</label><input id="blockDayDate" type="date" min="${isoDateLocal(new Date())}"></div><div class="actions" style="margin-top:12px"><button class="btn btn-green" type="button" onclick="addBlockedDay()">Bloquear el día entero</button></div></div>
     <div class="card-head"><div><div class="kicker">Administración</div><h3>Bloqueos activos · ${ordered.length}</h3></div></div>${list}`;
+  renderBlockSlotTimes();
+}
+// Fecha y horario elegidos en el bloqueo por horario específico.
+let blockSlotDateValue='', blockSlotTimeValue='';
+function onBlockSlotDateChange(v){ blockSlotDateValue=v||''; blockSlotTimeValue=''; renderBlockSlotTimes(); }
+function renderBlockSlotTimes(){
+  const grid=document.getElementById('blockSlotTimes'); if(!grid)return;
+  grid.innerHTML='';
+  const date=blockSlotDateValue;
+  if(!date){grid.innerHTML='<div class="closed" style="grid-column:1/-1">Elegí primero una fecha.</div>';return;}
+  const slots=buildTimes(date);
+  if(!slots.length){grid.innerHTML='<div class="closed" style="grid-column:1/-1">El local está cerrado ese día.</div>';return;}
+  if(isDayBlocked(date)){grid.innerHTML='<div class="closed" style="grid-column:1/-1">Ese día ya está bloqueado completo.</div>';return;}
+  const now=new Date();
+  for(const t of slots){
+    const alreadyBlocked=blockedSlots.some(b=>b.date===date&&b.time===t);
+    const taken=isTaken(date,t);
+    const past=parseDateTime(date,t)<=now;
+    const off=alreadyBlocked||taken||past;
+    const btn=document.createElement('button'); btn.type='button';
+    btn.className='time'+(blockSlotTimeValue===t?' active':'')+(off?' taken':'');
+    btn.disabled=off;
+    btn.textContent=t;
+    btn.title=alreadyBlocked?'Ya bloqueado':taken?'Tiene un turno reservado':past?'Horario pasado':'';
+    if(!off) btn.onclick=()=>{blockSlotTimeValue=t;renderBlockSlotTimes();};
+    grid.appendChild(btn);
+  }
 }
 let blockedSlotSaving=false;
 async function addBlockedSlot(){
   if(!barberLogged){showToast('Ingresá al modo barbero para realizar esta acción.');return;}
   if(blockedSlotSaving)return;
-  const dateInput=document.getElementById('blockSlotDate');
-  const timeInput=document.getElementById('blockSlotTime');
-  const date=dateInput?.value;
-  const time=timeInput?.value;
+  const date=blockSlotDateValue;
+  const time=blockSlotTimeValue;
   if(!date||!time){showToast('Elegí una fecha y un horario.');return;}
   if(isDayBlocked(date)||blockedSlots.some(b=>b.date===date&&b.time===time)){showToast('Ese día u horario ya está bloqueado.');return;}
   if(!buildTimes(date).includes(time)){showToast('Ese horario no corresponde al horario de atención del local.');return;}
@@ -1924,6 +1949,7 @@ async function addBlockedSlot(){
     const idx=blockedSlots.findIndex(b=>b.id===optimisticId);
     if(idx>=0)blockedSlots[idx]=saved;
     else blockedSlots.push(saved);
+    blockSlotTimeValue='';
     renderTimes();
     renderBlockedTab();
     showToast('Horario bloqueado. Ya no aparece para los clientes.');
@@ -1961,7 +1987,7 @@ async function removeBlockedSlot(id){
   try{
     await supabaseRequest('blocked_slots?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:{'Prefer':'return=minimal'}});
     blockedSlots=blockedSlots.filter(b=>b.id!==id);
-    renderAllPreserveScroll();showToast('Bloqueo eliminado. El horario volvió a estar disponible.');
+    renderAllPreserveScroll();renderBlockSlotTimes();showToast('Bloqueo eliminado. El horario volvió a estar disponible.');
   }catch(e){console.error('No se pudo quitar el bloqueo:',e);showToast('No se pudo quitar el bloqueo. Intentá nuevamente.');}
 }
 
