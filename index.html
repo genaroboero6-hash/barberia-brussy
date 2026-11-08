@@ -173,8 +173,8 @@ footer{padding:45px 0 60px;color:#6f887c;font-size:.78rem;text-align:center}.foo
 
 
 /* Optimización uso móvil (sin cambiar diseño) */
-html,body{overscroll-behavior-y:contain}
-.date-strip{-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;touch-action:pan-x}
+html,body{overscroll-behavior-y:auto}
+.date-strip{-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;touch-action:auto}
 .date-strip .day{scroll-snap-align:start;flex:none}
 .btn,.day,.time,.service,.copy,.panel-nav button,.close{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .field input{font-size:16px} /* evita zoom automático en iOS */
@@ -1226,6 +1226,46 @@ button,a{touch-action:manipulation}
 }
 
 
+
+/* Compatibilidad táctil Android/iOS: no bloquear el gesto vertical de la página. */
+html, body {
+  min-height: 100%;
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: auto;
+}
+.date-strip {
+  touch-action: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.table-wrap {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.modal {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: auto;
+}
+.modal-card {
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+@supports (-webkit-touch-callout: none) {
+  .modal-card { max-height: 90vh; }
+}
+
 </style>
 </head>
 <body>
@@ -1357,7 +1397,7 @@ Brussy Barbería · Turnos online con Bruno Pérez · Historial protegido con re
 </div></footer>
 
 
-<div class="modal" id="registerModal"><div class="modal-card"><div class="modal-head"><div><div class="kicker">Cuenta</div><h3>Registro / inicio sesión</h3></div><button class="close" onclick="hideModal('registerModal')">×</button></div><div class="modal-actions" style="justify-content:flex-start;margin:0 0 14px"><button class="btn btn-green" type="button" id="accountModeCreate" onclick="setAccountMode('create')">Crear mi cuenta</button><button class="btn btn-ghost" type="button" id="accountModeLogin" onclick="setAccountMode('login')">Iniciar sesión</button></div><p class="small" id="accountModeText" style="margin-bottom:15px">Creá tu cuenta para reservar turnos, consultar tu historial y recibir tus beneficios.</p><div class="form-grid"><div class="field"><label>Nombre</label><input id="firstName" placeholder="Bruno" autocomplete="given-name"></div><div class="field"><label>Apellido</label><input id="lastName" placeholder="Pérez" autocomplete="family-name"></div><div class="field"><label>Teléfono</label><input id="phone" inputmode="tel" placeholder="342 555 0105" autocomplete="tel"></div><div class="field"><label>Documento</label><input id="dni" inputmode="numeric" placeholder="12345678"></div></div><p class="error" id="registerError"></p><div class="modal-actions"><button class="btn btn-ghost" onclick="hideModal('registerModal')">Cancelar</button><button class="btn btn-green" id="accountSubmit" onclick="submitAccount()">Crear cuenta y continuar</button></div></div></div>
+<div class="modal" id="registerModal"><div class="modal-card"><div class="modal-head"><div><div class="kicker">Cuenta</div><h3>Registro / inicio sesión</h3></div><button class="close" onclick="hideModal('registerModal')">×</button></div><div class="modal-actions" style="justify-content:flex-start;margin:0 0 14px"><button class="btn btn-green" type="button" id="accountModeCreate" onclick="setAccountMode('create')">Crear mi cuenta</button><button class="btn btn-ghost" type="button" id="accountModeLogin" onclick="setAccountMode('login')">Iniciar sesión</button></div><p class="small" id="accountModeText" style="margin-bottom:15px">Creá tu cuenta para reservar turnos, consultar tu historial y recibir tus beneficios.</p><div class="form-grid"><div class="field" id="firstNameField"><label>Nombre</label><input id="firstName" placeholder="Bruno" autocomplete="given-name"></div><div class="field" id="lastNameField"><label>Apellido</label><input id="lastName" placeholder="Pérez" autocomplete="family-name"></div><div class="field" id="phoneField"><label>Teléfono</label><input id="phone" inputmode="tel" placeholder="342 555 0105" autocomplete="tel"></div><div class="field" id="dniField"><label>DNI</label><input id="dni" inputmode="numeric" placeholder="12345678"></div></div><p class="error" id="registerError"></p><div class="modal-actions"><button class="btn btn-ghost" onclick="hideModal('registerModal')">Cancelar</button><button class="btn btn-green" id="accountSubmit" onclick="submitAccount()">Crear cuenta y continuar</button></div></div></div>
 <div class="modal" id="barberLoginModal"><div class="modal-card" style="max-width:420px"><div class="modal-head"><div><div class="kicker">Acceso</div><h3>Modo barbero</h3></div><button class="close" onclick="hideModal('barberLoginModal')">×</button></div><p class="small">Introduzca contraseña</p><div class="field" style="margin-top:14px"><label>Contraseña</label><input id="barberPin" type="password" placeholder="Contraseña" autocomplete="current-password"></div><p class="error" id="barberError"></p><div class="modal-actions"><button class="btn btn-ghost" onclick="hideModal('barberLoginModal')">Cancelar</button><button class="btn btn-green" onclick="loginBarber()">Entrar</button></div></div></div>
 <div class="modal" id="manualCutModal"><div class="modal-card" style="max-width:520px"><div class="modal-head"><div><div class="kicker">Historial</div><h3>Registrar corte</h3></div><button class="close" onclick="hideModal('manualCutModal')">×</button></div><div id="manualCutInfo"></div><div class="form-grid" style="margin-top:14px"><div class="field"><label>Fecha</label><input type="date" id="cutDate"></div><div class="field"><label>Hora</label><input type="time" id="cutTime"></div></div><div class="price-box" style="margin-top:14px"><div class="price-item selected"><span>Precio vigente</span><strong id="manualPrice">$12.000</strong></div><div class="price-item" id="manualDiscountBox"><span>Fidelidad</span><strong id="manualDiscount">Sin descuento</strong></div></div><label style="display:flex;gap:9px;align-items:center;margin-top:14px;color:#cfe0d8;font-size:.82rem"><input type="checkbox" id="useReward"> Aplicar 10% del QR ya leído</label><p class="notice">El corte se agregará al historial del cliente y actualizará automáticamente su contador de fidelidad.</p><div class="modal-actions"><button class="btn btn-ghost" onclick="hideModal('manualCutModal')">Cancelar</button><button class="btn btn-green" onclick="saveManualCut()">Registrar corte</button></div></div></div>
 <div class="modal" id="historyModal"><div class="modal-card"><div class="modal-head"><div><div class="kicker">Cliente</div><h3 id="historyModalTitle">Historial</h3></div><button class="close" onclick="hideModal('historyModal')">×</button></div><div id="historyModalBody"></div></div></div>
@@ -1705,19 +1745,34 @@ function setAccountMode(mode){
   const create=document.getElementById('accountModeCreate'), login=document.getElementById('accountModeLogin'), text=document.getElementById('accountModeText'), submit=document.getElementById('accountSubmit');
   if(!create||!login||!text||!submit)return;
   create.className=mode==='create'?'btn btn-green':'btn btn-ghost'; login.className=mode==='login'?'btn btn-green':'btn btn-ghost';
-  if(mode==='create'){text.textContent='Creá tu cuenta para reservar turnos, consultar tu historial y recibir tus beneficios.';submit.textContent='Crear cuenta y continuar';document.getElementById('firstName').disabled=false;document.getElementById('lastName').disabled=false;document.getElementById('phone').disabled=false;}
-  else{text.textContent='Ingresá tu teléfono y documento para recuperar tu cuenta y todo tu historial guardado.';submit.textContent='Iniciar sesión';document.getElementById('firstName').disabled=true;document.getElementById('lastName').disabled=true;document.getElementById('phone').disabled=false;}
+  const firstNameField=document.getElementById('firstNameField'), lastNameField=document.getElementById('lastNameField'), phoneField=document.getElementById('phoneField');
+  const firstName=document.getElementById('firstName'), lastName=document.getElementById('lastName'), phone=document.getElementById('phone'), dni=document.getElementById('dni');
+  if(mode==='create'){
+    text.textContent='Creá tu cuenta para reservar turnos, consultar tu historial y recibir tus beneficios. El teléfono es obligatorio para poder contactarte por WhatsApp.';
+    submit.textContent='Crear cuenta y continuar';
+    firstNameField.style.display=''; lastNameField.style.display=''; phoneField.style.display='';
+    firstName.disabled=false; lastName.disabled=false; phone.disabled=false; dni.disabled=false;
+    firstName.required=true; lastName.required=true; phone.required=true; dni.required=true;
+  }else{
+    text.textContent='Ingresá tu nombre, apellido y DNI para recuperar tu cuenta y todo tu historial guardado.';
+    submit.textContent='Iniciar sesión';
+    firstNameField.style.display=''; lastNameField.style.display=''; phoneField.style.display='none';
+    firstName.disabled=false; lastName.disabled=false; phone.disabled=true; dni.disabled=false;
+    firstName.required=true; lastName.required=true; phone.required=false; dni.required=true;
+  }
 }
 function openRegister(){
   const client=getClient(); document.getElementById('firstName').value=client?.firstName||''; document.getElementById('lastName').value=client?.lastName||''; document.getElementById('phone').value=client?.phone||''; document.getElementById('dni').value=client?.dni||''; document.getElementById('registerError').classList.remove('show'); setAccountMode(client?'login':'create'); showModal('registerModal');
 }
 function submitAccount(){ if(accountMode==='login') loginClient(); else saveClient(); }
 async function loginClient(){
-  const phone=digits(document.getElementById('phone').value), dni=digits(document.getElementById('dni').value), err=document.getElementById('registerError');
+  const firstName=normalize(document.getElementById('firstName').value), lastName=normalize(document.getElementById('lastName').value), dni=digits(document.getElementById('dni').value), err=document.getElementById('registerError');
+  if(firstName.length<2||lastName.length<2||dni.length<6){err.textContent='Ingresá nombre, apellido y un DNI válido.';err.classList.add('show');return;}
   try{
-    const rows=await supabaseRequest('clients?select=*&phone=eq.'+encodeURIComponent(phone)+'&dni=eq.'+encodeURIComponent(dni)+'&limit=1');
-    const client=rows?.[0]?cloudClientFromRow(rows[0]):null;
-    if(!client){err.textContent='No encontramos una cuenta con esos datos. Elegí “Crear mi cuenta” si todavía no estás registrado.';err.classList.add('show');return;}
+    const rows=await supabaseRequest('clients?select=*&dni=eq.'+encodeURIComponent(dni)+'&limit=20');
+    const matched=rows?.find(r=>normalize(r.first_name)===firstName&&normalize(r.last_name)===lastName);
+    const client=matched?cloudClientFromRow(matched):null;
+    if(!client){err.textContent='No encontramos una cuenta con ese nombre, apellido y DNI. Revisá los datos o creá una cuenta.';err.classList.add('show');return;}
     state.clients=state.clients.filter(c=>c.id!==client.id).concat(client);
     activeClientId=client.id;localStorage.setItem('brussy_active_client',client.id);localStorage.setItem('brussy_active_client_data',JSON.stringify(client));hideModal('registerModal');renderAll();showToast(`Bienvenido, ${client.firstName}. Historial recuperado.`);openCustomerPanel();
   }catch(e){err.textContent='No se pudo consultar la cuenta online. Revisá tu conexión e intentá de nuevo.';err.classList.add('show');}
