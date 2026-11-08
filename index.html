@@ -1886,20 +1886,58 @@ function renderBlockedTab(){
     <div class="info-card" style="margin-bottom:18px"><strong>Bloquear un día entero</strong><p class="small" style="margin:6px 0 12px">Elegí una fecha para que no se muestre ningún horario disponible ese día.</p><div class="field"><label for="blockDayDate">Día completo</label><input id="blockDayDate" type="date" min="${isoDateLocal(new Date())}"></div><div class="actions" style="margin-top:12px"><button class="btn btn-green" type="button" onclick="addBlockedDay()">Bloquear el día entero</button></div></div>
     <div class="card-head"><div><div class="kicker">Administración</div><h3>Bloqueos activos · ${ordered.length}</h3></div></div>${list}`;
 }
+let blockedSlotSaving=false;
 async function addBlockedSlot(){
   if(!barberLogged){showToast('Ingresá al modo barbero para realizar esta acción.');return;}
-  const date=document.getElementById('blockSlotDate')?.value;
-  const time=document.getElementById('blockSlotTime')?.value;
+  if(blockedSlotSaving)return;
+  const dateInput=document.getElementById('blockSlotDate');
+  const timeInput=document.getElementById('blockSlotTime');
+  const date=dateInput?.value;
+  const time=timeInput?.value;
   if(!date||!time){showToast('Elegí una fecha y un horario.');return;}
   if(isDayBlocked(date)||blockedSlots.some(b=>b.date===date&&b.time===time)){showToast('Ese día u horario ya está bloqueado.');return;}
   if(!buildTimes(date).includes(time)){showToast('Ese horario no corresponde al horario de atención del local.');return;}
   if(isTaken(date,time)){showToast('Ese horario ya tiene un turno reservado. No se puede bloquear.');return;}
+
+  blockedSlotSaving=true;
+  const button=document.querySelector('#tab-blocked button[onclick="addBlockedSlot()"]');
+  if(button){button.disabled=true;button.textContent='Bloqueando…';}
+
+  // Ocultar el horario de inmediato, sin esperar la red ni reconstruir
+  // todo el panel (clientes, turnos e historial).
+  const optimisticId='pending-block-'+Date.now();
+  blockedSlots.push({id:optimisticId,date,time,createdAt:new Date().toISOString()});
+  if(selectedDate===date && selectedTime===time)selectedTime=null;
+  renderTimes();
+  renderBlockedTab();
+  showToast('Aplicando bloqueo…');
+
   try{
-    const rows=await supabaseRequest('blocked_slots',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify({date,time})});
-    const row=rows?.[0]; if(!row)throw new Error('Supabase no devolvió el bloqueo creado.');
-    blockedSlots.push({id:row.id,date:row.date,time:String(row.time).slice(0,5),createdAt:row.created_at});
-    selectedTime=null;renderAllPreserveScroll();showToast('Horario bloqueado. Ya no aparece para los clientes.');
-  }catch(e){console.error('No se pudo bloquear el horario:',e);showToast('No se pudo guardar el bloqueo en Supabase.');}
+    const rows=await supabaseRequest('blocked_slots',{
+      method:'POST',
+      headers:{'Prefer':'return=representation'},
+      body:JSON.stringify({date,time})
+    });
+    const row=rows?.[0];
+    if(!row)throw new Error('Supabase no devolvió el bloqueo creado.');
+    const saved={id:row.id,date:row.date,time:String(row.time).slice(0,5),createdAt:row.created_at};
+    const idx=blockedSlots.findIndex(b=>b.id===optimisticId);
+    if(idx>=0)blockedSlots[idx]=saved;
+    else blockedSlots.push(saved);
+    renderTimes();
+    renderBlockedTab();
+    showToast('Horario bloqueado. Ya no aparece para los clientes.');
+  }catch(e){
+    blockedSlots=blockedSlots.filter(b=>b.id!==optimisticId);
+    renderTimes();
+    renderBlockedTab();
+    console.error('No se pudo bloquear el horario:',e);
+    showToast('No se pudo guardar el bloqueo en Supabase. El horario volvió a estar disponible.');
+  }finally{
+    blockedSlotSaving=false;
+    const currentButton=document.querySelector('#tab-blocked button[onclick="addBlockedSlot()"]');
+    if(currentButton){currentButton.disabled=false;currentButton.textContent='Bloquear este horario';}
+  }
 }
 async function addBlockedDay(){
   if(!barberLogged){showToast('Ingresá al modo barbero para realizar esta acción.');return;}
