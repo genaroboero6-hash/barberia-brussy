@@ -1352,6 +1352,43 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 }
 
 </style>
+
+<style id="brussy-android-scroll-compat">
+/* Compatibilidad de desplazamiento vertical en Android, iOS y navegadores móviles.
+   El documento conserva el scroll nativo; los carruseles/tablas mantienen su scroll propio. */
+html {
+  height: auto !important;
+  min-height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: clip !important;
+  overscroll-behavior-y: auto !important;
+  touch-action: pan-y pinch-zoom !important;
+}
+body {
+  height: auto !important;
+  min-height: 100vh !important;
+  min-height: 100svh !important;
+  overflow-y: visible !important;
+  overflow-x: clip !important;
+  overscroll-behavior-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y pinch-zoom !important;
+}
+@supports not (overflow: clip) {
+  html, body { overflow-x: hidden !important; }
+}
+/* Solo las zonas que necesitan desplazamiento lateral capturan el gesto horizontal. */
+.date-strip, .panel-nav, .table-wrap {
+  touch-action: pan-x pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+}
+.modal-card {
+  overscroll-behavior-y: contain;
+  touch-action: pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+}
+</style>
+
 </head>
 <body>
 <div class="topbar">
